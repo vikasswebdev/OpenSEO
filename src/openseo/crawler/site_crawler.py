@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from openseo.crawler.http import HttpCrawler
 from openseo.crawler.playwright_crawler import PlaywrightCrawler
 from openseo.models.page import Page
-from openseo.constants import USER_AGENT
+from openseo.constants import CRAWLER_TIMEOUT, USER_AGENT
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class SiteCrawler:
             if page.status_code == 200 and page.body_text:
                 # Page extractor gets visible text. We need raw body, let's fetch it as text
                 import httpx
-                async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as client:
+                async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, timeout=CRAWLER_TIMEOUT) as client:
                     resp = await client.get(robots_url, follow_redirects=True)
                     if resp.status_code == 200:
                         self.robots_txt_content = resp.text
@@ -109,7 +109,7 @@ class SiteCrawler:
             for s_url in self.sitemap_urls:
                 try:
                     import httpx
-                    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as client:
+                    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, timeout=CRAWLER_TIMEOUT) as client:
                         resp = await client.get(s_url, follow_redirects=True)
                         if resp.status_code == 200:
                             soup = BeautifulSoup(resp.text, "xml")

@@ -409,7 +409,7 @@ def register(app: typer.Typer) -> None:
         max_pages: Annotated[int, typer.Option("--max-pages", help="Max pages to crawl for site audits (0 for unlimited)")] = 10,
         max_depth: Annotated[int, typer.Option("--depth", help="Maximum directory depth to crawl")] = 3,
         ignore_robots: Annotated[bool, typer.Option("--ignore-robots", help="Ignore robots.txt instructions")] = False,
-        report: Annotated[bool, typer.Option("--report", help="Generate a PDF report in results/ folder")] = False,
+        report: Annotated[bool, typer.Option("--report", help="Generate a PDF report in Downloads folder")] = False,
         sitemap_only: Annotated[bool, typer.Option("--sitemap-only", help="Only crawl URLs listed in sitemap.xml")] = False,
         interactive: Annotated[bool, typer.Option("--interactive", "-i", help="Run audit in interactive mode")] = False,
         verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose output")] = False,
@@ -444,7 +444,7 @@ def register(app: typer.Typer) -> None:
             no_llm = disable_llm
             
             # Ask about PDF report
-            report = typer.confirm("Generate a PDF report in results/ folder?", default=True)
+            report = typer.confirm("Generate a PDF report in Downloads folder?", default=True)
             typer.secho("\n🚀 Configuration locked! Starting audit...\n", fg=typer.colors.GREEN)
 
         asyncio.run(

@@ -27,8 +27,8 @@ class PdfRenderer:
     """Generates beautiful, professional PDF reports for website audits."""
 
     def __init__(self, output_dir: Path | None = None) -> None:
-        # Default to "results" folder in the current working directory
-        self.output_dir = output_dir or Path.cwd() / "results"
+        # Default to "Downloads" folder in the user's home directory
+        self.output_dir = output_dir or Path.home() / "Downloads"
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_report(self, result: Any) -> str:

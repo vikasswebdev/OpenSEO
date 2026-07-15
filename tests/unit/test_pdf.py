@@ -36,3 +36,11 @@ def test_pdf_report_generation(tmp_path):
     
     assert Path(file_path).exists()
     assert Path(file_path).name == "example_com_seo_report.pdf"
+
+
+def test_pdf_report_generation_default_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    renderer = PdfRenderer()
+    assert renderer.output_dir == tmp_path / "Downloads"
+    assert renderer.output_dir.exists()
+
