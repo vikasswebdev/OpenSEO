@@ -97,24 +97,174 @@ async def _run_schema(
         raise typer.Exit(1)
 
 
+def _generate_profile_template() -> dict:
+    name = typer.prompt("Person Name")
+    url = typer.prompt("Person Profile/About URL")
+    description = typer.prompt("Description", default="")
+    same_as_raw = typer.prompt("SameAs URLs (comma-separated, e.g., GitHub, Twitter)", default="")
+    knows_about_raw = typer.prompt("KnowsAbout topics (comma-separated)", default="")
+    works_for = typer.prompt("Company/Organization works for", default="")
+    job_title = typer.prompt("Job Title", default="")
+    
+    same_as = [s.strip() for s in same_as_raw.split(",") if s.strip()] if same_as_raw else None
+    knows_about = [k.strip() for k in knows_about_raw.split(",") if k.strip()] if knows_about_raw else None
+    
+    person = {"@type": "Person", "name": name, "url": url}
+    if description:
+        person["description"] = description
+    if same_as:
+        person["sameAs"] = same_as
+    if knows_about:
+        person["knowsAbout"] = knows_about
+    if works_for:
+        person["worksFor"] = {"@type": "Organization", "name": works_for}
+    if job_title:
+        person["jobTitle"] = job_title
+        
+    return {
+        "@context": "https://schema.org",
+        "@type": "ProfilePage",
+        "mainEntity": person,
+        "url": url,
+    }
+
+
+def _generate_discussion_template() -> dict:
+    headline = typer.prompt("Forum Topic/Discussion Headline")
+    author = typer.prompt("Author Name")
+    url = typer.prompt("Discussion URL")
+    date_published = typer.prompt("Date Published (ISO 8601, e.g., 2026-07-21)", default="")
+    text = typer.prompt("Discussion Text Excerpt", default="")
+    comment_count = typer.prompt("Comment Count", default="0")
+    
+    payload = {
+        "@context": "https://schema.org",
+        "@type": "DiscussionForumPosting",
+        "headline": headline,
+        "author": {"@type": "Person", "name": author},
+        "url": url,
+        "mainEntityOfPage": {"@type": "WebPage", "@id": url},
+    }
+    if date_published:
+        payload["datePublished"] = date_published
+    if text:
+        payload["text"] = text
+    try:
+        payload["commentCount"] = int(comment_count)
+    except ValueError:
+        pass
+    return payload
+
+
+def _generate_order_template() -> dict:
+    merchant = typer.prompt("Merchant Name")
+    order_url = typer.prompt("Order URL")
+    name = typer.prompt("Action Name", default="Order online")
+    
+    return {
+        "@context": "https://schema.org",
+        "@type": "OrderAction",
+        "name": name,
+        "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": order_url,
+            "inLanguage": "en-US",
+            "actionPlatform": [
+                "https://schema.org/DesktopWebPlatform",
+                "https://schema.org/MobileWebPlatform",
+            ],
+        },
+        "deliveryMethod": [
+            "https://schema.org/OnSitePickup",
+            "https://schema.org/ParcelService",
+        ],
+        "priceSpecification": {
+            "@type": "PriceSpecification",
+            "eligibleTransactionVolume": {
+                "@type": "PriceSpecification",
+                "minPrice": 0,
+                "priceCurrency": "USD",
+            },
+        },
+        "merchant": {"@type": "Organization", "name": merchant},
+    }
+
+
+def _generate_reservation_template() -> dict:
+    provider = typer.prompt("Reservation Provider Name")
+    start = typer.prompt("Start Time (ISO 8601, e.g. 2026-07-21T19:30:00)")
+    party_size = typer.prompt("Party Size", default="")
+    reservation_id = typer.prompt("Reservation ID", default="")
+    kind = typer.prompt("Reservation Kind", default="FoodEstablishmentReservation")
+    
+    payload = {
+        "@context": "https://schema.org",
+        "@type": kind,
+        "reservationStatus": "https://schema.org/ReservationConfirmed",
+        "provider": {"@type": "Organization", "name": provider},
+        "reservationFor": {
+            "@type": "FoodEstablishment" if kind == "FoodEstablishmentReservation" else "Place",
+            "name": provider,
+        },
+        "startTime": start,
+    }
+    if party_size:
+        try:
+            payload["partySize"] = int(party_size)
+        except ValueError:
+            pass
+    if reservation_id:
+        payload["reservationId"] = reservation_id
+    return payload
+
+
 def register(app: typer.Typer) -> None:
     """Register the schema command."""
 
     @app.command("schema")
     def schema(
-        url: Annotated[str, typer.Argument(help="URL to generate schema for")],
+        url: Annotated[Optional[str], typer.Argument(help="URL to generate schema for")] = None,
         content_type: Annotated[str, typer.Option("--type", "-t", help="Content type hint")] = "auto",
         provider: Annotated[Optional[str], typer.Option("--provider", "-p")] = None,
         model: Annotated[Optional[str], typer.Option("--model", "-m")] = None,
         output: Annotated[str, typer.Option("--output", "-o")] = "terminal",
+        template: Annotated[Optional[str], typer.Option("--template", help="Interactive schema template (profile, discussion, order, reservation)")] = None,
     ) -> None:
         """
-        Generate schema.org JSON-LD structured data for a URL.
+        Generate schema.org JSON-LD structured data.
 
         Examples:
 
           seo schema https://example.com/blog/post
 
-          seo schema https://shop.com/product --type product
+          seo schema --template profile
         """
-        asyncio.run(_run_schema(url, content_type, provider, model, output))
+        if template:
+            template = template.lower()
+            if template == "profile":
+                data = _generate_profile_template()
+            elif template == "discussion":
+                data = _generate_discussion_template()
+            elif template == "order":
+                data = _generate_order_template()
+            elif template == "reservation":
+                data = _generate_reservation_template()
+            else:
+                typer.echo(f"Error: Unknown template '{template}'. Use profile, discussion, order, or reservation.", err=True)
+                raise typer.Exit(1)
+
+            if output == "terminal":
+                syntax = Syntax(
+                    json.dumps(data, indent=2),
+                    "json",
+                    theme="monokai",
+                    line_numbers=True,
+                )
+                console.print(Panel(syntax, title=f"[bold]Generated Template: {template.capitalize()}[/]", border_style="green"))
+            else:
+                print(json.dumps(data, indent=2))
+        else:
+            if not url:
+                typer.echo("Error: URL is required unless using --template.", err=True)
+                raise typer.Exit(1)
+            asyncio.run(_run_schema(url, content_type, provider, model, output))

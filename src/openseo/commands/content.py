@@ -27,6 +27,7 @@ async def _run_content(
     provider: str | None,
     model: str | None,
     output: str,
+    quality: bool = False,
 ) -> None:
     renderer = get_renderer(output)
     config_manager = get_config_manager()
@@ -38,6 +39,41 @@ async def _run_content(
     except Exception as e:
         renderer.render_error(str(e))
         raise typer.Exit(1)
+
+    qrg_data = None
+    if quality:
+        from openseo.analyzers.qrg import analyze_qrg
+        qrg_data = analyze_qrg(page.body_text or "")
+
+        if output == "terminal":
+            color = "green" if qrg_data["overall_quality"] >= 70 else "yellow" if qrg_data["overall_quality"] >= 50 else "red"
+            filler_color = "red" if qrg_data["filler_score"] >= 50 else "yellow" if qrg_data["filler_score"] >= 30 else "green"
+            ai_color = "red" if qrg_data["ai_pattern_score"] >= 40 else "yellow" if qrg_data["ai_pattern_score"] >= 20 else "green"
+            density_color = "green" if qrg_data["information_density"] >= 0.40 else "yellow" if qrg_data["information_density"] >= 0.20 else "red"
+            rep_color = "red" if qrg_data["repetition_score"] >= 30 else "yellow" if qrg_data["repetition_score"] >= 15 else "green"
+            
+            panel_content = (
+                f"[bold]Overall Quality Score:[/] [{color}]{qrg_data['overall_quality']}/100[/]\n"
+                f"  • [bold]Filler Score:[/] [{filler_color}]{qrg_data['filler_score']}/100[/] (lower is better)\n"
+                f"  • [bold]AI-Pattern Score:[/] [{ai_color}]{qrg_data['ai_pattern_score']}/100[/] (lower is better)\n"
+                f"  • [bold]Information Density:[/] [{density_color}]{qrg_data['information_density']:.2f}[/] (range: 0.0 - 1.0)\n"
+                f"  • [bold]Repetition Score:[/] [{rep_color}]{qrg_data['repetition_score']}/100[/] (lower is better)\n"
+                f"  • [bold]Word/Token Count:[/] {qrg_data['tokens']} ({qrg_data['unique_tokens']} unique)\n"
+            )
+            if qrg_data["flags"]:
+                panel_content += f"  • [bold]Flags:[/] [orange1]{', '.join(qrg_data['flags'])}[/]\n"
+
+            console.print(Panel(
+                panel_content.strip(),
+                title="[bold]QRG Quality Metrics",
+                border_style="bright_magenta",
+            ))
+
+            if qrg_data["matches"]["filler"]:
+                console.print(f"[bold yellow]Filler Hits:[/] {', '.join(qrg_data['matches']['filler'][:8])}")
+            if qrg_data["matches"]["ai_patterns"]:
+                console.print(f"[bold cyan]AI Pattern Hits:[/] {', '.join(qrg_data['matches']['ai_patterns'][:8])}")
+            console.print()
 
     llm = LLMService(config_manager, provider_override=provider, model_override=model)
     prompt_manager = PromptManager()
@@ -85,10 +121,16 @@ async def _run_content(
                 for s in suggestions:
                     console.print(f"  → {s}")
         else:
+            if qrg_data:
+                data["qrg_quality"] = qrg_data
             print(json.dumps(data, indent=2))
 
     except Exception as e:
-        renderer.render_error(str(e))
+        # If LLM fails but we got QRG data, and output was not terminal, print QRG data at least
+        if qrg_data and output != "terminal":
+            print(json.dumps({"qrg_quality": qrg_data, "llm_error": str(e)}, indent=2))
+        else:
+            renderer.render_error(str(e))
         raise typer.Exit(1)
 
 
@@ -102,6 +144,7 @@ def register(app: typer.Typer) -> None:
         provider: Annotated[Optional[str], typer.Option("--provider", "-p")] = None,
         model: Annotated[Optional[str], typer.Option("--model", "-m")] = None,
         output: Annotated[str, typer.Option("--output", "-o")] = "terminal",
+        quality: Annotated[bool, typer.Option("--quality", "-q", help="Run local QRG quality checks (AI patterns, filler, density)")] = False,
     ) -> None:
         """
         Analyze and optimize page content with AI.
@@ -109,5 +152,7 @@ def register(app: typer.Typer) -> None:
         Examples:
 
           seo content https://example.com/blog/post --keyword "python tutorial"
+          
+          seo content https://example.com/blog/post --quality
         """
-        asyncio.run(_run_content(url, keyword, provider, model, output))
+        asyncio.run(_run_content(url, keyword, provider, model, output, quality))

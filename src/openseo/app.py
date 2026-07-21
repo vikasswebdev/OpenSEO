@@ -59,7 +59,7 @@ def create_app() -> typer.Typer:
     )
 
     # ── Register Built-in Commands ────────────────────────────────────────────
-    from openseo.commands import audit, config_cmd, content, doctor, init, keywords, provider, robots, schema, sitemap
+    from openseo.commands import audit, config_cmd, content, doctor, init, keywords, provider, robots, schema, sitemap, drift
 
     init.register(app)
     config_cmd.register(app)
@@ -71,6 +71,7 @@ def create_app() -> typer.Typer:
     doctor.register(app)
     sitemap.register(app)
     robots.register(app)
+    drift.register(app)
 
     # ── Version Command ───────────────────────────────────────────────────────
     @app.command("version")

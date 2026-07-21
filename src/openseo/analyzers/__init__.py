@@ -10,6 +10,7 @@ from openseo.analyzers.title import analyze_title
 from openseo.analyzers.technical import analyze_page_technical, analyze_site_technical
 from openseo.analyzers.duplicates import detect_duplicate_clusters
 from openseo.analyzers.link_graph import build_link_graph
+from openseo.analyzers.qrg import analyze_qrg
 
 __all__ = [
     "analyze_title",
@@ -23,4 +24,5 @@ __all__ = [
     "analyze_site_technical",
     "detect_duplicate_clusters",
     "build_link_graph",
+    "analyze_qrg",
 ]
